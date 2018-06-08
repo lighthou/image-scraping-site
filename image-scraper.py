@@ -12,16 +12,19 @@ app = Flask(__name__)
 def my_form():
     return render_template('my-form.html')
 
-url = ""
-
 @app.route('/', methods=['POST'])
 def my_form_post():
     text = request.form['text']
     processed_text = text.upper()
-    url = "google.com.au/search?q=" + text
+    url = "http://google.com.au/search?q=" + text
+    run_scrape(url)
     return processed_text
 
+def run_scrape(url):
+    driver = webdriver.Chrome()
+    driver.implicitly_wait(30)
+    print(url)
+    driver.get(url)
 
 if __name__ == "__main__":
     app.run() 
-
