@@ -23,8 +23,9 @@ def my_form_post():
 def run_scrape(url):
     driver = webdriver.Chrome()
     driver.implicitly_wait(30)
-    print(url)
     driver.get(url)
+    images_button = driver.find_element_by_xpath("//*[text()='Images']")
+    images_button.click()
 
 if __name__ == "__main__":
     app.run() 
