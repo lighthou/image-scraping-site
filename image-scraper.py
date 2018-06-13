@@ -4,7 +4,8 @@ from bs4 import BeautifulSoup
 import re
 import pandas
 import os
-import urllib
+import sys
+from urllib.request import urlretrieve
 from flask import Flask, request, render_template
 from PIL import Image
 
@@ -23,30 +24,29 @@ def my_form_post():
     uploaded_file.save(os.path.join("UPLOADS", uploaded_file.filename))
     break_image_to_rgb("UPLOADS/" + uploaded_file.filename)
     processed_text = text.upper()
-    scrape_images(text)
+    #scrape_images(text)
     return processed_text
 
 
 def break_image_to_rgb(image):
     photo = Image.open(image)
     photo = photo.convert('RGB')
-
+    photo_dictionary = {}
     width, height = photo.size
-    x_y_image_count = 100
+    x_y_image_count = 10
+    divider = (width/x_y_image_count) * (height/x_y_image_count)
     for y in range (0, x_y_image_count):
         for x in range(0, x_y_image_count):
-            rgb_total = 0, 0, 0
-            for y1 in range(height/x_y_image_count * y, (height / x_y_image_count) * (y+1)):
-                for x1 in range(width/x_y_image_count * x, (width / x_y_image_count) * (x+1)):
-                    r, g, b = photo.getpixel((x1, y1))
-                    r1, g1, b1 = rgb_total
-                    rgb_total = r + r1, g + g1, b + b1
-            r, g, b = rgb_total
-            x = height/x_y_image_count * width/x_y_image_count
-            print(r/x, g/x, b/x)
+            tr, tg, tb = 0, 0, 0
+            for y1 in range(round(height/x_y_image_count * y), round(height / x_y_image_count) * (y+1)):
+                for x1 in range(round(width/x_y_image_count * x), round(width / x_y_image_count * (x+1))):
+                    if x1 < width and y1 < height:
+                        r, g, b = photo.getpixel((x1, y1))
+                        tr, tg, tb = tr + r, tg + g, tb + b
+            photo_dictionary[x, y] = int(tr/divider), int(tg/divider), int(tb/divider)
+    print(photo_dictionary)
 
-
-
+            
 
 def scrape_images(keyword):
     url = "http://google.com.au/search?q=" + keyword
@@ -66,9 +66,9 @@ def scrape_images(keyword):
     for img in soup.find_all('img', alt=alt):
         img_url = img.get('data-src')
         if img_url is not None:
-            img_name = keyword + "/" + keyword + "_" + str(count)
+            img_name = keyword + "/" + keyword + "_" + str(count) +".png"
             count += 1
-            urllib.urlretrieve(img_url, img_name)
+            urlretrieve(img_url, img_name)
 
 
 if __name__ == "__main__":
