@@ -43,8 +43,7 @@ def break_image_to_rgb(image):
                     if x1 < width and y1 < height:
                         r, g, b = photo.getpixel((x1, y1))
                         tr, tg, tb = tr + r, tg + g, tb + b
-            photo_dictionary[x, y] = int(tr/divider), int(tg/divider), int(tb/divider)
-    print(photo_dictionary)
+            photo_dictionary[x, y] = min(255, int(tr/divider)), min(int(tg/divider), 255), min(255, int(tb/divider))
 
             
 
