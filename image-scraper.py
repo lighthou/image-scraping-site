@@ -40,6 +40,7 @@ def my_form_post():
     im1 = Image.new("RGB", (width, height))
     pix1 = im1.load()
     for (key, value) in col_dic.items():
+        print(key, len(value))
         for x_y in value:
             for x in range(width // images_on_side * x_y[0], (width // images_on_side) * (x_y[0] + 1)):
                 for y in range (height // images_on_side * x_y[1], (height // images_on_side) * (x_y[1] + 1)):
@@ -94,6 +95,7 @@ def break_image_to_rgb(image):
                     if x1 < width and y1 < height:
                         r, g, b = photo.getpixel((x1, y1))
                         tr, tg, tb = tr + r, tg + g, tb + b
+
             r, g, b = min(255, int(tr/divider)), min(int(tg/divider), 255), min(255, int(tb/divider))
             photo_dictionary[x, y] = r,g,b
             check_r_g_b(r,g,b,x,y,color_dictionary)
@@ -101,48 +103,40 @@ def break_image_to_rgb(image):
     return  color_dictionary, photo_dictionary, width, height
 
 def check_r_g_b(r,g,b,x,y, color_dictionary):
-    flag = False 
+    flag = False
+
+    if((r,g,b) in color_dictionary):
+        color_dictionary[(r,g,b)] += [(x,y)]
+        
     for i in range(10):
         for j in range(10):
             for z in range(10):
-                if((r,g,b) in color_dictionary):
-                    color_dictionary[(r,g,b)] += [(x,y)]
-                    flag = True
+                if ((r - i,g - j,b + z) in color_dictionary):
+                    color_dictionary[(r - i,g - j,b + z)] += [(x,y)]
                     return
-                elif ((r - i,g - i,b + i) in color_dictionary):
-                    color_dictionary[(r - i,g - i,b + i)] += [(x,y)]
-                    flag = True
+                elif ((r - i,g - j,b - z) in color_dictionary):
+                    color_dictionary[(r - i,g - j,b - z)] += [(x,y)]
                     return
-                elif ((r - i,g - i,b - i) in color_dictionary):
-                    color_dictionary[(r - i,g - i,b - i)] += [(x,y)]
-                    flag = True
+                elif ((r - i,g + j,b + z) in color_dictionary):
+                    color_dictionary[(r - i,g + j,b + z)] += [(x,y)]
                     return
-                elif ((r - i,g + i,b + i) in color_dictionary):
-                    color_dictionary[(r - i,g + i,b + i)] += [(x,y)]
-                    flag = True
+                elif ((r - i,g + j,b - z) in color_dictionary):
+                    color_dictionary[(r - i,g + j,b - z)] += [(x,y)]
                     return
-                elif ((r - i,g + i,b - i) in color_dictionary):
-                    color_dictionary[(r - i,g + i,b - i)] += [(x,y)]
-                    flag = True
+                elif ((r + i,g - j,b + z) in color_dictionary):
+                    color_dictionary[(r + i,g - j,b + z)] += [(x,y)]
                     return
-                elif ((r + i,g - i,b + i) in color_dictionary):
-                    color_dictionary[(r + i,g - i,b + i)] += [(x,y)]
-                    flag = True
+                elif ((r + i,g - j,b - z) in color_dictionary):
+                    color_dictionary[(r + i,g - j,b - z)] += [(x,y)]
                     return
-                elif ((r + i,g - i,b - i) in color_dictionary):
-                    color_dictionary[(r + i,g - i,b - i)] += [(x,y)]
-                    flag = True
+                elif ((r + i,g + j,b + z) in color_dictionary):
+                    color_dictionary[(r + i,g + j,b + z)] += [(x,y)]
                     return
-                elif ((r + i,g + i,b + i) in color_dictionary):
-                    color_dictionary[(r + i,g + i,b + i)] += [(x,y)]
-                    flag = True
+                elif ((r + i,g + j,b - z) in color_dictionary):
+                    color_dictionary[(r + i,g + j,b - z)] += [(x,y)]
                     return
-                elif ((r + i,g + i,b - i) in color_dictionary):
-                    color_dictionary[(r + i,g + i,b - i)] += [(x,y)]
-                    flag = True
-                    return
-    if (not flag):
-        color_dictionary[(r,g,b)] = [(x,y)]
+    
+    color_dictionary[(r,g,b)] = [(x,y)]
     
 def rgb_of_whole_img(image):
     photo = Image.open(image)
