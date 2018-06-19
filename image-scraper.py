@@ -103,8 +103,6 @@ def break_image_to_rgb(image):
     return  color_dictionary, photo_dictionary, width, height
 
 def check_r_g_b(r,g,b,x,y, color_dictionary):
-    flag = False
-
     if((r,g,b) in color_dictionary):
         color_dictionary[(r,g,b)] += [(x,y)]
         
