@@ -8,6 +8,7 @@ import sys
 from urllib.request import urlretrieve
 from flask import Flask, request, render_template
 from PIL import Image
+import math
 
 app = Flask(__name__)
 
@@ -22,40 +23,34 @@ def my_form_post():
     text = request.form['text']
     uploaded_file = request.files['file']
     uploaded_file.save(os.path.join("UPLOADS", uploaded_file.filename))
-    col_dic, dic, width, height = break_image_to_rgb("UPLOADS/" + uploaded_file.filename)
-    width = width * 10
-    height = height * 10
-    images_on_side = 100
+    col_dic, dic, width, height, width_par, height_par = break_image_to_rgb("UPLOADS/" + uploaded_file.filename)
 
+    IMAGE_SIZE_MULTIPLIER = 10
     
-##    im = Image.new("RGB", (width, height))
-##    pix = im.load()
-##    for (key, value) in dic.items():
-##        for x in range(width // images_on_side * key[0], (width // images_on_side) * (key[0] + 1)):
-##            for y in range (height // images_on_side * key[1], (height // images_on_side) * (key[1] + 1)):
-##                pix[x,y] = value
-##                
-##    im.save("test.png", "PNG")
+    width = width * IMAGE_SIZE_MULTIPLIER
+    height = height * IMAGE_SIZE_MULTIPLIER
+    width_par = width_par * IMAGE_SIZE_MULTIPLIER
+    height_par = height_par * IMAGE_SIZE_MULTIPLIER
 
     im1 = Image.new("RGB", (width, height))
     pix1 = im1.load()
     for (key, value) in col_dic.items():
-        print(key, len(value))
         for x_y in value:
-            for x in range(width // images_on_side * x_y[0], (width // images_on_side) * (x_y[0] + 1)):
-                for y in range (height // images_on_side * x_y[1], (height // images_on_side) * (x_y[1] + 1)):
-                    pix1[x,y] = key
+            for x in range(width_par * x_y[0], width_par * (x_y[0] + 1)):
+                for y in range (height_par * x_y[1], height_par * (x_y[1] + 1)):
+                    if (x < width and y < height): 
+                        pix1[x,y] = key
                 
     im1.save("test1.png", "PNG")
 
 
-    
+    dic = {}
     processed_text = text.upper()
-    #scrape_images(text, dic)
+    scrape_images(text, dic)
     return processed_text
             
 
-def scrape_images(keyword):
+def scrape_images(keyword, dictionary):
     url = "http://google.com.au/search?q=" + keyword
     driver = webdriver.Chrome()
     driver.implicitly_wait(30)
@@ -73,10 +68,13 @@ def scrape_images(keyword):
     for img in soup.find_all('img', alt=alt):
         img_url = img.get('data-src')
         if img_url is not None:
-            img_name = keyword + "/" + keyword + "_" + str(count) +".png"
+            img_name = keyword + "/temp.png"
             count += 1
             urlretrieve(img_url, img_name)
             r,g,b = rgb_of_whole_img(img_name)
+            os.remove(img_name)
+            rgb_name= keyword + "/" + str(r) + " " + str(g) + " " + str(b) + ".png"
+            urlretrieve(img_url, rgb_name)
 
 
 def break_image_to_rgb(image):
@@ -86,12 +84,14 @@ def break_image_to_rgb(image):
     color_dictionary = {}
     width, height = photo.size
     x_y_image_count = 100
-    divider = (width/x_y_image_count) * (height/x_y_image_count)
-    for y in range (0, x_y_image_count):
-        for x in range(0, x_y_image_count):
+    width_partition = math.ceil(width/x_y_image_count)
+    height_paritition = math.ceil(height/x_y_image_count)
+    divider = width_partition * height_paritition
+    for y in range(x_y_image_count):
+        for x in range(x_y_image_count):
             tr, tg, tb = 0, 0, 0
-            for y1 in range(round(height/x_y_image_count * y), round(height / x_y_image_count * (y+1))):
-                for x1 in range(round(width/x_y_image_count * x), round(width / x_y_image_count * (x+1))):
+            for y1 in range(height_paritition * y, height_paritition * (y+1)):
+                for x1 in range(width_partition * x, width_partition * (x+1)):
                     if x1 < width and y1 < height:
                         r, g, b = photo.getpixel((x1, y1))
                         tr, tg, tb = tr + r, tg + g, tb + b
@@ -100,7 +100,7 @@ def break_image_to_rgb(image):
             photo_dictionary[x, y] = r,g,b
             check_r_g_b(r,g,b,x,y,color_dictionary)
             
-    return  color_dictionary, photo_dictionary, width, height
+    return  color_dictionary, photo_dictionary, width, height, width_partition, height_paritition
 
 def check_r_g_b(r,g,b,x,y, color_dictionary):
     if((r,g,b) in color_dictionary):
@@ -145,7 +145,7 @@ def rgb_of_whole_img(image):
     tr, tg, tb = 0, 0, 0
     for y in range(0, height):
         for x in range(0, width):
-            r, g, b = photo.getpixel((x1, y1))
+            r, g, b = photo.getpixel((x, y))
             tr, tg, tb = tr + r, tg + g, tb + b
     return min(255, int(tr/divider)), min(int(tg/divider), 255), min(255, int(tb/divider))
 
