@@ -23,7 +23,7 @@ def my_form_post():
     text = request.form['text']
     uploaded_file = request.files['file']
     uploaded_file.save(os.path.join("UPLOADS", uploaded_file.filename))
-    col_dic, dic, width, height, width_par, height_par = break_image_to_rgb("UPLOADS/" + uploaded_file.filename)
+    col_dic, width, height, width_par, height_par = break_image_to_rgb("UPLOADS/" + uploaded_file.filename)
 
     IMAGE_SIZE_MULTIPLIER = 10
     
@@ -32,8 +32,9 @@ def my_form_post():
     width_par = width_par * IMAGE_SIZE_MULTIPLIER
     height_par = height_par * IMAGE_SIZE_MULTIPLIER
 
-    im1 = Image.new("RGB", (width, height))
-    pix1 = im1.load()
+    result = Image.new("RGB", (width, height))
+    
+    pix1 = result.load()
     for (key, value) in col_dic.items():
         for x_y in value:
             for x in range(width_par * x_y[0], width_par * (x_y[0] + 1)):
@@ -41,16 +42,15 @@ def my_form_post():
                     if (x < width and y < height): 
                         pix1[x,y] = key
                 
-    im1.save("test1.png", "PNG")
+    result.save("result.png", "PNG")
+    
 
-
-    dic = {}
     processed_text = text.upper()
-    scrape_images(text, dic)
+    scrape_images(text, width_par, height_par, col_dic)
     return processed_text
             
 
-def scrape_images(keyword, dictionary):
+def scrape_images(keyword, width, height, dictionary):
     url = "http://google.com.au/search?q=" + keyword
     driver = webdriver.Chrome()
     driver.implicitly_wait(30)
@@ -60,7 +60,6 @@ def scrape_images(keyword, dictionary):
 
     soup = BeautifulSoup(driver.page_source, "html.parser")
     alt = "Image result for " + keyword
-    count = 0
 
     if not os.path.exists(keyword):
         os.makedirs(keyword)
@@ -69,18 +68,18 @@ def scrape_images(keyword, dictionary):
         img_url = img.get('data-src')
         if img_url is not None:
             img_name = keyword + "/temp.png"
-            count += 1
             urlretrieve(img_url, img_name)
             r,g,b = rgb_of_whole_img(img_name)
-            os.remove(img_name)
-            rgb_name= keyword + "/" + str(r) + " " + str(g) + " " + str(b) + ".png"
-            urlretrieve(img_url, rgb_name)
+            rgb_name= keyword + "/" + str(r) + "," + str(g) + "," + str(b) + ".png"
+            os.rename(img_name, rgb_name)
+            img = Image.open(rgb_name)
+            img.thumbnail((width, height), Image.ANTIALIAS)
+            img.save(rgb_name)
 
 
 def break_image_to_rgb(image):
     photo = Image.open(image)
     photo = photo.convert('RGB')
-    photo_dictionary = {}
     color_dictionary = {}
     width, height = photo.size
     x_y_image_count = 100
@@ -97,10 +96,9 @@ def break_image_to_rgb(image):
                         tr, tg, tb = tr + r, tg + g, tb + b
 
             r, g, b = min(255, int(tr/divider)), min(int(tg/divider), 255), min(255, int(tb/divider))
-            photo_dictionary[x, y] = r,g,b
-            check_r_g_b(r,g,b,x,y,color_dictionary)
+            check_r_g_b(r, g, b, x, y, color_dictionary)
             
-    return  color_dictionary, photo_dictionary, width, height, width_partition, height_paritition
+    return  color_dictionary, width, height, width_partition, height_paritition
 
 def check_r_g_b(r,g,b,x,y, color_dictionary):
     if((r,g,b) in color_dictionary):
