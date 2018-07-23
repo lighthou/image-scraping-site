@@ -33,49 +33,29 @@ def my_form_post():
     height_par = height_par * IMAGE_SIZE_MULTIPLIER
 
     result = Image.new("RGB", (width, height))
-    
-    pix1 = result.load()
-    for (key, value) in col_dic.items():
-        for x_y in value:
-            for x in range(width_par * x_y[0], width_par * (x_y[0] + 1)):
-                for y in range (height_par * x_y[1], height_par * (x_y[1] + 1)):
-                    if (x < width and y < height): 
-                        pix1[x,y] = key
-                
-    result.save("result.png", "PNG")
+##    
+##    pix1 = result.load()
+##    for (key, value) in col_dic.items():
+##        for x_y in value:
+##            for x in range(width_par * x_y[0], width_par * (x_y[0] + 1)):
+##                for y in range (height_par * x_y[1], height_par * (x_y[1] + 1)):
+##                    if (x < width and y < height): 
+##                        pix1[x,y] = key
+##                
+##    result.save("result.png", "PNG")
     
 
     processed_text = text.upper()
-    scrape_images(text, width_par, height_par, col_dic)
+    image_dic = scrape_images(text, width_par, height_par, col_dic)
+    for (key, value) in image_dic.items():
+        image = Image.open(key)
+        for x_y in value:
+            adjusted = (x_y[0] * width_par, x_y[1] * height_par)
+            result.paste(im=image, box=adjusted)
+
+    result.save("result.png", "PNG")
+    
     return processed_text
-            
-
-def scrape_images(keyword, width, height, dictionary):
-    url = "http://google.com.au/search?q=" + keyword
-    driver = webdriver.Chrome()
-    driver.implicitly_wait(30)
-    driver.get(url)
-    images_button = driver.find_element_by_xpath("//*[text()='Images']")
-    images_button.click()
-
-    soup = BeautifulSoup(driver.page_source, "html.parser")
-    alt = "Image result for " + keyword
-
-    if not os.path.exists(keyword):
-        os.makedirs(keyword)
-
-    for img in soup.find_all('img', alt=alt):
-        img_url = img.get('data-src')
-        if img_url is not None:
-            img_name = keyword + "/temp.png"
-            urlretrieve(img_url, img_name)
-            r,g,b = rgb_of_whole_img(img_name)
-            rgb_name= keyword + "/" + str(r) + "," + str(g) + "," + str(b) + ".png"
-            os.rename(img_name, rgb_name)
-            img = Image.open(rgb_name)
-            img.thumbnail((width, height), Image.ANTIALIAS)
-            img.save(rgb_name)
-
 
 def break_image_to_rgb(image):
     photo = Image.open(image)
@@ -100,10 +80,113 @@ def break_image_to_rgb(image):
             
     return  color_dictionary, width, height, width_partition, height_paritition
 
+def scrape_images(keyword, width, height, color_dictionary):
+    image_dictionary = {}
+    
+    url = "http://google.com.au/search?q=" + keyword
+    driver = webdriver.Chrome()
+    driver.implicitly_wait(30)
+    driver.get(url)
+    images_button = driver.find_element_by_xpath("//*[text()='Images']")
+    images_button.click()
+
+    soup = BeautifulSoup(driver.page_source, "html.parser")
+    alt = "Image result for " + keyword
+
+
+    #
+    count = 0
+    #
+    
+    if not os.path.exists(keyword):
+        os.makedirs(keyword)
+
+    for img in soup.find_all('img', alt=alt):
+        img_url = img.get('data-src')
+        if img_url is not None:
+            img_name = keyword + "/temp.png"
+            urlretrieve(img_url, img_name)
+            r,g,b = rgb_of_whole_img(img_name)
+
+
+            #Check here
+            rgb_name = is_valid_rgb_for_image(r,g,b, color_dictionary, image_dictionary, keyword)
+            if rgb_name == "":
+                os.remove(img_name)
+            else:
+                #
+                count +=1
+                #
+
+                os.rename(img_name, rgb_name)
+                img = Image.open(rgb_name)
+                img.thumbnail((width, height), Image.ANTIALIAS)
+                img.save(rgb_name)
+
+                if (count == 40):
+                    return image_dictionary
+                
+    return image_dictionary
+
+
+def is_valid_rgb_for_image(r,g,b, color_dictionary, image_dictionary, keyword):
+    
+    if((r,g,b) in color_dictionary):
+        img_name = keyword + "/" + str(r) + "," + str(g) + "," + str(b) + ".png"
+        image_dictionary[img_name] = color_dictionary[(r,g,b)]
+        return img_name
+    
+    for i in range(10):
+        for j in range(10):
+            for z in range(10):
+                if ((r - i,g - j,b + z) in color_dictionary):
+                    img_name = keyword + "/" + str(r - i) + "," + str(g - j) + "," + str(b + z) + ".png"
+                    image_dictionary[img_name] = color_dictionary[(r - i,g - j,b + z)]
+                    color_dictionary.pop((r - i,g - j,b + z), None)
+                    return img_name
+                elif ((r - i,g - j,b - z) in color_dictionary):
+                    img_name = keyword + "/" + str(r - i) + "," + str(g - j) + "," + str(b - z) + ".png"
+                    image_dictionary[img_name] = color_dictionary[(r - i,g - j,b - z)]
+                    color_dictionary.pop((r - i,g - j,b - z), None)
+                    return img_name
+                elif ((r - i,g + j,b + z) in color_dictionary):
+                    img_name = keyword + "/" + str(r - i) + "," + str(g + j) + "," + str(b + z) + ".png"
+                    image_dictionary[img_name] = color_dictionary[(r - i,g + j,b + z)]
+                    color_dictionary.pop((r - i,g + j,b + z), None)
+                    return img_name
+                elif ((r - i,g + j,b - z) in color_dictionary):
+                    img_name = keyword + "/" + str(r - i) + "," + str(g + j) + "," + str(b - z) + ".png"
+                    image_dictionary[img_name] = color_dictionary[(r - i,g + j,b - z)]
+                    color_dictionary.pop((r - i,g + j,b - z), None)
+                    return img_name
+                elif ((r + i,g - j,b + z) in color_dictionary):
+                    img_name = keyword + "/" + str(r + i) + "," + str(g - j) + "," + str(b + z) + ".png"
+                    image_dictionary[img_name] = color_dictionary[(r + i,g - j,b + z)]
+                    color_dictionary.pop((r + i,g - j,b + z), None)
+                    return img_name
+                elif ((r + i,g - j,b - z) in color_dictionary):
+                    img_name = keyword + "/" + str(r + i) + "," + str(g - j) + "," + str(b - z) + ".png"
+                    image_dictionary[img_name] = color_dictionary[(r + i,g - j,b - z)]
+                    color_dictionary.pop((r + i,g - j,b - z), None)
+                    return img_name
+                elif ((r + i,g + j,b + z) in color_dictionary):
+                    img_name = keyword + "/" + str(r + i) + "," + str(g + j) + "," + str(b + z) + ".png"
+                    image_dictionary[img_name] = color_dictionary[(r + i,g + j,b + z)]
+                    color_dictionary.pop((r + i,g + j,b + z), None)
+                    return img_name
+                elif ((r + i,g + j,b - z) in color_dictionary):
+                    img_name = keyword + "/" + str(r + i) + "," + str(g + j) + "," + str(b - z) + ".png"
+                    image_dictionary[img_name] = color_dictionary[(r + i,g + j,b - z)]
+                    color_dictionary.pop((r + i,g + j,b - z), None)
+                    return img_name
+    return ""
+    
+
 def check_r_g_b(r,g,b,x,y, color_dictionary):
     if((r,g,b) in color_dictionary):
         color_dictionary[(r,g,b)] += [(x,y)]
-        
+        return
+    
     for i in range(10):
         for j in range(10):
             for z in range(10):
