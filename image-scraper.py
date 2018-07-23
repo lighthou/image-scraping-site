@@ -134,6 +134,7 @@ def is_valid_rgb_for_image(r,g,b, color_dictionary, image_dictionary, keyword):
     if((r,g,b) in color_dictionary):
         img_name = keyword + "/" + str(r) + "," + str(g) + "," + str(b) + ".png"
         image_dictionary[img_name] = color_dictionary[(r,g,b)]
+        color_dictionary.pop((r,g,b), None)
         return img_name
     
     for i in range(10):
