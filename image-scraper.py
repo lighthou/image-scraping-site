@@ -9,6 +9,7 @@ from urllib.request import urlretrieve
 from flask import Flask, request, render_template
 from PIL import Image
 import math
+import time
 
 app = Flask(__name__)
 
@@ -33,28 +34,24 @@ def my_form_post():
     height_par = height_par * IMAGE_SIZE_MULTIPLIER
 
     result = Image.new("RGB", (width, height))
-##    
-##    pix1 = result.load()
-##    for (key, value) in col_dic.items():
-##        for x_y in value:
-##            for x in range(width_par * x_y[0], width_par * (x_y[0] + 1)):
-##                for y in range (height_par * x_y[1], height_par * (x_y[1] + 1)):
-##                    if (x < width and y < height): 
-##                        pix1[x,y] = key
-##                
-##    result.save("result.png", "PNG")
     
+    searches = ["", " pictures", " photos", " images", " pics", " photographs"]
+    image_dictionary = {}
 
-    processed_text = text.upper()
-    image_dic = scrape_images(text, width_par, height_par, col_dic)
-    for (key, value) in image_dic.items():
+    for word in searches:
+        search = text + word
+        scrape_images(search, width_par, height_par, col_dic, image_dictionary)
+
+
+    for (key, value) in image_dictionary.items():
         image = Image.open(key)
         for x_y in value:
             adjusted = (x_y[0] * width_par, x_y[1] * height_par)
             result.paste(im=image, box=adjusted)
 
     result.save("result.png", "PNG")
-    
+
+    processed_text = text.upper()
     return processed_text
 
 def break_image_to_rgb(image):
@@ -80,53 +77,67 @@ def break_image_to_rgb(image):
             
     return  color_dictionary, width, height, width_partition, height_paritition
 
-def scrape_images(keyword, width, height, color_dictionary):
-    image_dictionary = {}
-    
+
+def scroll(driver):
+    SCROLL_PAUSE_TIME = 0.5
+
+    last_height = driver.execute_script("return document.body.scrollHeight")
+    saw_more = False
+
+    while True:
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(SCROLL_PAUSE_TIME)
+        new_height = driver.execute_script("return document.body.scrollHeight")
+
+        if new_height == last_height:
+            if saw_more:
+                break
+            
+            see_more_results = driver.find_element_by_xpath("//input[@value='Show more results']");
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
+            if see_more_results.is_displayed():
+                see_more_results.click()
+            else:
+                break
+
+        last_height = new_height
+
+def scrape_images(keyword, width, height, color_dictionary, image_dictionary):
     url = "http://google.com.au/search?q=" + keyword
     driver = webdriver.Chrome()
     driver.implicitly_wait(30)
     driver.get(url)
+    
     images_button = driver.find_element_by_xpath("//*[text()='Images']")
     images_button.click()
 
+    scroll(driver)
     soup = BeautifulSoup(driver.page_source, "html.parser")
     alt = "Image result for " + keyword
 
-
-    #
-    count = 0
-    #
-    
     if not os.path.exists(keyword):
         os.makedirs(keyword)
 
     for img in soup.find_all('img', alt=alt):
-        img_url = img.get('data-src')
+        img_url = img.get('src')
+        if img_url is None:
+            img_url = img.get('data-src')
+        
         if img_url is not None:
             img_name = keyword + "/temp.png"
             urlretrieve(img_url, img_name)
             r,g,b = rgb_of_whole_img(img_name)
-
-
-            #Check here
             rgb_name = is_valid_rgb_for_image(r,g,b, color_dictionary, image_dictionary, keyword)
+            
             if rgb_name == "":
                 os.remove(img_name)
+
             else:
-                #
-                count +=1
-                #
-
-                os.rename(img_name, rgb_name)
-                img = Image.open(rgb_name)
-                img.thumbnail((width, height), Image.ANTIALIAS)
-                img.save(rgb_name)
-
-                if (count == 40):
-                    return image_dictionary
-                
-    return image_dictionary
+                img = Image.open(img_name)
+                returned_img = img.resize((width, height))
+                os.remove(img_name)
+                returned_img.save(rgb_name)
 
 
 def is_valid_rgb_for_image(r,g,b, color_dictionary, image_dictionary, keyword):
