@@ -7,6 +7,7 @@ from urllib.request import urlretrieve
 from bs4 import BeautifulSoup
 from multiprocessing import Pool, Manager
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 import time
 
 app = Flask(__name__)
@@ -15,6 +16,11 @@ color_dictionary = {}
 mgr_color_dictionary = Manager().dict()
 image_dictionary = Manager().dict()
 
+RESIZED_HEIGHT_PARTITION = 0
+RESIZED_WIDTH_PARTITION = 0
+TOTAL_IMAGES_NEEDED = 0
+
+
 @app.route('/')
 def my_form():
     return render_template('my-form.html')
@@ -22,6 +28,9 @@ def my_form():
 
 @app.route('/', methods=['POST'])
 def my_form_post():
+    global RESIZED_HEIGHT_PARTITION
+    global RESIZED_WIDTH_PARTITION
+
     image_keyword = request.form['text']
     uploaded_file = request.files['file']
     uploaded_file.save(os.path.join("UPLOADS", uploaded_file.filename))
@@ -30,20 +39,26 @@ def my_form_post():
     mgr_color_dictionary.update(color_dictionary)
     print("Done breaking down image.")
 
+    IMAGE_SIZE_MULTIPLIER = 10
+    constructed_photo_width = photo_width * IMAGE_SIZE_MULTIPLIER
+    constructed_photo_height = photo_height * IMAGE_SIZE_MULTIPLIER
+    RESIZED_WIDTH_PARTITION = pixels_per_width_image * IMAGE_SIZE_MULTIPLIER
+    RESIZED_HEIGHT_PARTITION = pixels_per_height_image * IMAGE_SIZE_MULTIPLIER
+
     searches = ["", " pictures", " photos", " images", " pics", " photographs"]
     searches_with_key_words = []
 
     for word in searches:
         searches_with_key_words.append(image_keyword + word)
 
-    with Pool(20) as p:
+    with Pool(6) as p:
         p.map(scrape_images_by_keyword, searches_with_key_words)
 
-    result = Image.new("RGB", (photo_width, photo_height))
+    result = Image.new("RGB", (constructed_photo_width, constructed_photo_height))
     for (key, value) in image_dictionary.items():
         image = Image.open(key)
         for x_y in value:
-            adjusted = (x_y[0] * pixels_per_width_image, x_y[1] * pixels_per_height_image)
+            adjusted = (x_y[0] * RESIZED_WIDTH_PARTITION, x_y[1] * RESIZED_HEIGHT_PARTITION)
             result.paste(im=image, box=adjusted)
 
     result.save("result.png", "PNG")
@@ -60,7 +75,10 @@ def my_form_post():
 def scrape_images_by_keyword(keyword):
 
     url = "http://google.com.au/search?q=" + keyword
-    driver = webdriver.Chrome()
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--disable-gpu')  # Last I checked this was necessary.
+    driver = webdriver.Chrome(executable_path='/usr/bin/chromedriver', chrome_options=options)
     driver.implicitly_wait(30)
     driver.get(url)
 
@@ -89,13 +107,15 @@ def scrape_images_by_keyword(keyword):
                 os.remove(img_name)
             else:
                 rgb_name = keyword + "/" + str(r) + "," + str(g) + "," + str(b) + ".png"
-                image_dictionary[img_name] = color_dictionary[(r, g, b)]
+                image_dictionary[rgb_name] = color_dictionary[(r, g, b)]
                 mgr_color_dictionary.pop((r, g, b), None)
-                print(len(mgr_color_dictionary.keys()))
+
+                percent=(len(color_dictionary.keys())-len(mgr_color_dictionary.keys()))/len(color_dictionary.keys())*100
+                print(str(int(percent)) + "% of images sourced.")
                 img = Image.open(img_name)
-                #img_resized = img.resize((width, height))
+                img_resized = img.resize((RESIZED_WIDTH_PARTITION, RESIZED_HEIGHT_PARTITION))
                 os.remove(img_name)
-                img.save(rgb_name)
+                img_resized.save(rgb_name)
 
 
 
